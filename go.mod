@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/hashicorp/mdns v1.0.6
+	github.com/natefinch/atomic v1.0.1
 	github.com/prometheus/common v0.64.0
 )
 
