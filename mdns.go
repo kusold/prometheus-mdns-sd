@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
-	"io/ioutil"
 	"log"
 	"sort"
 	"strings"
@@ -64,7 +63,7 @@ var (
 
 func init() {
 	// hashicorp/mdns outputs a lot of garbage on stdlog, so quiet it down...
-	log.SetOutput(ioutil.Discard)
+	// log.SetOutput(ioutil.Discard)
 }
 
 func main() {
@@ -163,7 +162,7 @@ func (dd *Discovery) refreshAll(ctx context.Context, ch chan<- []*TargetGroup) {
 	for _, name := range names {
 		go func(n string) {
 			if err := dd.refresh(ctx, n, targetChan); err != nil {
-				//log.Errorf("Error refreshing DNS targets: %s", err)
+				log.Println("Error refreshing DNS targets: %s", err)
 			}
 			wg.Done()
 		}(name)
@@ -177,13 +176,18 @@ func (dd *Discovery) refreshAll(ctx context.Context, ch chan<- []*TargetGroup) {
 // TODO: Re-do so we select over ctx.Done(), a mdns response, mdns being done or an error
 func (dd *Discovery) refresh(ctx context.Context, name string, ch chan<- *TargetGroup) error {
 	// Set up output channel and read discovered data
-	responses := make(chan *mdns.ServiceEntry, 100)
+	responses := make(chan *mdns.ServiceEntry, 1000)
 
 	// Do the actual lookup
 	go func() {
 		// TODO: Capture err somewhere
 		//err := mdns.Lookup(name, responses)
-		mdns.Lookup(name, responses)
+		query := mdns.QueryParam{
+			Service:     name,
+			DisableIPv6: true,
+			Entries:     responses,
+		}
+		mdns.Query(&query)
 		close(responses)
 	}()
 
@@ -199,6 +203,7 @@ func (dd *Discovery) refresh(ctx context.Context, name string, ch chan<- *Target
 			// Make a new targetGroup with one address-label for each thing we scape
 			//
 			// Check https://github.com/prometheus/common/blob/master/model/labels.go for possible labels.
+			log.Printf("Found: %s %s", response.Name, response.Info)
 			tg := &TargetGroup{
 				Labels: map[string]string{
 					model.InstanceLabel: strings.TrimRight(response.Host, "."),
