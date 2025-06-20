@@ -188,6 +188,7 @@ func (dd *Discovery) refresh(ctx context.Context, name string, ch chan<- *Target
 			Service:     name,
 			DisableIPv6: true,
 			Entries:     responses,
+			Timeout:     2 * time.Second,
 		}
 		// Set the network interface if provided
 		if *ifaceName != "" {
