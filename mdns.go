@@ -59,7 +59,7 @@ func (t TargetGroups) Less(i, j int) bool {
 }
 
 var (
-	interval  = flag.Duration("interval", 10*time.Second, "How often to query for services")
+	interval  = flag.Duration("interval", 30*time.Second, "How often to query for services")
 	output    = flag.String("out", "-", "Filename to write output to")
 	ifaceName = flag.String("interface", "", "Network interface to use for mDNS discovery (empty for all interfaces)")
 )
@@ -188,7 +188,7 @@ func (dd *Discovery) refresh(ctx context.Context, name string, ch chan<- *Target
 			Service:     name,
 			DisableIPv6: true,
 			Entries:     responses,
-			Timeout:     2 * time.Second,
+			Timeout:     10 * time.Second,
 		}
 		// Set the network interface if provided
 		if *ifaceName != "" {
