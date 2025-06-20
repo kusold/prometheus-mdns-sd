@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log"
+	"net"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -57,8 +59,9 @@ func (t TargetGroups) Less(i, j int) bool {
 }
 
 var (
-	interval = flag.Duration("interval", 10*time.Second, "How often to query for services")
-	output   = flag.String("out", "-", "Filename to write output to")
+	interval  = flag.Duration("interval", 10*time.Second, "How often to query for services")
+	output    = flag.String("out", "-", "Filename to write output to")
+	ifaceName = flag.String("interface", "", "Network interface to use for mDNS discovery (empty for all interfaces)")
 )
 
 func init() {
@@ -161,6 +164,7 @@ func (dd *Discovery) refreshAll(ctx context.Context, ch chan<- []*TargetGroup) {
 	wg.Add(len(names))
 	for _, name := range names {
 		go func(n string) {
+			log.Println("Refreshing for ", name)
 			if err := dd.refresh(ctx, n, targetChan); err != nil {
 				log.Println("Error refreshing DNS targets: %s", err)
 			}
@@ -180,14 +184,25 @@ func (dd *Discovery) refresh(ctx context.Context, name string, ch chan<- *Target
 
 	// Do the actual lookup
 	go func() {
-		// TODO: Capture err somewhere
-		//err := mdns.Lookup(name, responses)
-		query := mdns.QueryParam{
+		params := &mdns.QueryParam{
 			Service:     name,
 			DisableIPv6: true,
 			Entries:     responses,
 		}
-		mdns.Query(&query)
+		// Set the network interface if provided
+		if *ifaceName != "" {
+			iface, err := net.InterfaceByName(*ifaceName)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error finding interface %s: %v\n", *ifaceName, err)
+			} else {
+				log.Println("Using interface: ", iface.Name)
+				params.Interface = iface
+			}
+		}
+		err := mdns.Query(params)
+		if err != nil {
+			log.Println("Error querying mdns: ", err)
+		}
 		close(responses)
 	}()
 
